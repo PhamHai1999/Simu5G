@@ -1,0 +1,304 @@
+[General]
+network = MultiCellwithSecondaryGnb
+image-path=../../../images
+output-scalar-file-append = false
+sim-time-limit=40s
+seed-set = ${repetition}
+
+debug-on-errors = false
+
+############### Ten File luu ##################
+output-scalar-file = test2.sca
+output-vector-file = test2.vec
+
+**.vector-recording = true
+**.sctp.**.scalar-recording = false  # xoa du lieu nhieu khoi SCTP
+**.sctp.**.vector-recording = false  # xoa du lieu nhieu khoi SCTP 
+**.routingRecorder.enabled = false
+
+############ Tham so xac dinh khong gian mo phong #################
+**.mobility.constraintAreaMaxX = 1000m
+**.mobility.constraintAreaMaxY = 700m
+**.mobility.constraintAreaMinX = 0m
+**.mobility.constraintAreaMinY = 0m
+**.mobility.constraintAreaMinZ = 0m
+**.mobility.constraintAreaMaxZ = 0m
+**.mobility.initFromDisplayString = false
+
+############### IPv4 configurator config #################
+##*.configurator.config = xmldoc("./demo.xml")
+
+############### SCTP configuration ##################
+**.sctp.nagleEnabled = false    # true thi viec truyen cac goi tin nho se bi delay tren interface X2 
+**.sctp.enableHeartbeats = false
+
+**.fading = true
+**.shadowing = true
+**.targetBler = 0.01
+**.blerShift = 5  
+
+
+#------------------------------------#
+# Config DualConnectivity
+#
+# cau hinh Topo cho kich ban
+#
+[Config DualConnectivity]
+
+
+############### cau hinh e/gNodeB  #################
+*.masterEnb1.mobility.initialX = 300m
+*.masterEnb1.mobility.initialY = 300m
+*.secondaryGnb1.mobility.initialX = 500m
+*.secondaryGnb1.mobility.initialY = 400m
+
+*.masterEnb2.mobility.initialX = 700m
+*.masterEnb2.mobility.initialY = 300m
+*.secondaryGnb2.mobility.initialX = 800m
+*.secondaryGnb2.mobility.initialY = 400m
+
+# the LTE eNodeB phai cai dat NR PDCP layer de thuc hien Dual Connectivity
+# the NR gNodeB cai dat NR PDCP layer theo default
+*.masterEnb*.nicType = "LteNicEnbD2D"
+*.masterEnb*.cellularNic.LtePdcpRrcType = "NRPdcpRrcEnb"
+*.secondaryGnb1.masterId = 1
+*.secondaryGnb2.masterId = 3
+**.dualConnectivityEnabled = true
+
+# cau hinh lop vat li
+**.downlink_interference = true
+**.uplink_interference = true
+*.masterEnb*.cellularNic.phy.eNodeBTxPower = 40
+*.secondaryGnb*.cellularNic.phy.eNodeBTxPower = 20
+**.minRssi = 1dB
+
+############### cau hinh song mang ######################## 
+*.carrierAggregation.numComponentCarriers = 2
+*.carrierAggregation.componentCarrier[0].carrierFrequency = 2GHz
+*.carrierAggregation.componentCarrier[0].numBands = 50
+*.carrierAggregation.componentCarrier[0].numerologyIndex = 0
+*.carrierAggregation.componentCarrier[1].carrierFrequency = 4GHz
+*.carrierAggregation.componentCarrier[1].numBands = 50
+*.carrierAggregation.componentCarrier[1].numerologyIndex = 0
+
+*.masterEnb*.cellularNic.numCarriers = 1
+*.masterEnb*.cellularNic.channelModel[0].componentCarrierIndex = 0
+*.secondaryGnb*.cellularNic.numCarriers = 1
+*.secondaryGnb*.cellularNic.channelModel[0].componentCarrierIndex = 1
+
+*.ue[*].cellularNic.numCarriers = 1
+*.ue[*].cellularNic.numNRCarriers = 1
+*.ue[*].cellularNic.channelModel[0].componentCarrierIndex = 0
+*.ue[*].cellularNic.nrChannelModel[0].componentCarrierIndex = 1
+
+
+############### cau hinh interface X2  #################
+*.masterEnb*.numX2Apps = 2    # 1 x2App cho moi node ngang hang
+*.secondaryGnb*.numX2Apps = 1    # 1 x2App cho moi node ngang hang
+*.*.x2App[*].server.localPort = 5000 + ancestorIndex(1) # Server ports (x2App[0]=5000, x2App[1]=5001, ...)
+
+# Dual connectivity connections
+*.masterEnb1.x2App[0].client.connectAddress = "secondaryGnb1%x2ppp0" 
+*.masterEnb2.x2App[0].client.connectAddress = "secondaryGnb2%x2ppp0" 
+*.secondaryGnb1.x2App[0].client.connectAddress = "masterEnb1%x2ppp0" 
+*.secondaryGnb2.x2App[0].client.connectAddress = "masterEnb2%x2ppp0" 
+
+# inter-master nodes connections
+*.masterEnb1.x2App[1].client.connectAddress = "masterEnb2%x2ppp1" 
+*.masterEnb2.x2App[1].client.connectAddress = "masterEnb1%x2ppp1" 
+
+############## cau hinh UE  ##################
+*.numUe = 1
+
+# trong giai doan khoi tao UE chon tram goc co RSRP lon nhat
+**.dynamicCellAssociation = true
+**.enableHandover = true
+
+# ket noi UE's NIC voi eNB/gNB tuong ung
+# NOTE: these parameters are ignored when dynamicCellAssociation=true
+*.ue[*].macCellId = 1   
+*.ue[*].masterId = 1
+*.ue[*].nrMacCellId = 2
+*.ue[*].nrMasterId = 2
+
+
+# Vi tri UE
+*.ue[*].mobilityType = "LinearMobility"
+*.ue[*].mobility.initialX = 300m
+*.ue[*].mobility.initialY = 350m
+*.ue[*].mobility.speed = 13.9mps  # 50 Km/h
+*.ue[*].mobility.initialMovementHeading = 0deg
+
+#------------------------------------#
+
+
+
+
+###########################
+# Runnable configurations #
+###########################
+
+# In the current version, the Ip2Nic module of the master eNB (the UE) selects which path
+# to follow based on the Type of Service (TOS) field:
+# - use master eNB if tos < 10
+# - use secondary gNB if 10 <= tos < 20
+# - use split bearer if tos >= 20
+#
+# To change the policy, change the implementation of the Ip2Nic::markPacket() function 
+
+
+#------------------------------------#
+# Config SingleConnection-CBR-DL
+#
+# In this configuration, the UE has one downlink connection, which goes through the 
+# secondary gNB. If the secondary gNB is out of range, then the data flow goes 
+# through the LTE master eNB
+[Config SingleConnection-CBR-DL]
+extends = DualConnectivity
+
+# 1 UDP cho moi user
+*.ue[*].numApps = 1
+
+# so luong UDP bang (numUEs)*(ue[*].numApps) 
+*.server.numApps = 1
+
+#============= cai dat Application  =============
+*.ue[*].app[*].typename = "CbrReceiver"
+*.ue[*].app[*].localPort = 3000
+
+*.server.app[*].typename = "CbrSender"								 
+*.server.app[*].destAddress = "ue[" + string(ancestorIndex(0)) + "]" # lay dia chi khac hang  bang cach doc chi so trong chuoi cua app
+*.server.app[*].localPort = 3088+ancestorIndex(0) 
+*.server.app[*].destPort = 3000
+*.server.app[*].PacketSize = 1000
+*.server.app[*].sampling_time = 0.05s
+*.server.app[*].startTime = uniform(0.02s, 0.05s)
+*.server.app[*].finishTime = 39.9s
+*.server.app[*].tos = 10
+#------------------------------------#
+
+
+
+
+#------------------------------------#
+# cai dat SingleConnection-CBR-UL
+#
+# O cai dat nay, UE co 1 ket noi uplink di qua secondary gNB. 
+# Neu gNB ra khoi tam du lieu se di vao LTE eNB chinh 
+
+[Config SingleConnection-CBR-UL]
+extends = DualConnectivity
+
+# 1 UDP cho moi user
+*.ue[*].numApps = 1
+
+# so luong UDP bang (numUEs)*(ue[*].numApps) 
+*.server.numApps = 1
+
+#============= cai dat Application  =============
+*.server.app[*].typename = "CbrReceiver"
+*.server.app[*].localPort = 3000
+
+*.ue[*].app[*].typename = "CbrSender"
+*.ue[*].app[*].destAddress = "server" 
+*.ue[*].app[*].PacketSize = 1000
+*.ue[*].app[*].sampling_time = 0.05s
+*.ue[*].app[*].localPort = 3088
+*.ue[*].app[*].destPort = 3000
+*.ue[*].app[*].startTime = uniform(0.02s, 0.05s)
+*.ue[*].app[*].finishTime = 39.9s
+*.ue[*].app[*].tos = 10
+#------------------------------------#
+
+#------------------------------------#
+# Config DoubleConnection-CBR-DL
+#
+# O cai dat nay, UE co rieng 2 ket noi DL , 
+# 1 di qua eNodeB con lai di qua gNodeB
+
+[Config DoubleConnection-CBR-DL]
+extends = DualConnectivity
+
+# 1 UDP cho moi user
+*.ue[*].numApps = 2
+
+# so luong UDP bang (numUEs)*(ue[*].numApps) 
+*.server.numApps = 2
+
+#============= cai dat Applications  =============
+*.ue[*].app[*].typename = "CbrReceiver"
+*.ue[*].app[*].localPort = 3000+ancestorIndex(0) 
+
+*.server.app[*].typename = "CbrSender"
+*.server.app[*].destAddress = "ue[0]" # lay dia chi khac hang  bang cach doc chi so trong chuoi cua app
+*.server.app[*].localPort = 3088+ancestorIndex(0) 
+*.server.app[*].destPort = 3000+ancestorIndex(0) 
+*.server.app[*].PacketSize = 1000
+*.server.app[*].sampling_time = 0.05s
+*.server.app[*].startTime = uniform(0.02s, 0.05s)
+*.server.app[*].finishTime = 39.9s
+*.server.app[0].tos = -1
+*.server.app[1].tos = 10
+#------------------------------------#
+
+
+#------------------------------------#
+# Config DoubleConnection-CBR-UL
+#
+# O cai dat nay, UE co rieng 2 ket noi UL , 
+# 1 di qua eNodeB con lai di qua gNodeB
+[Config DoubleConnection-CBR-UL]
+extends = DualConnectivity
+
+# 1 UDP cho moi user
+*.ue[*].numApps = 2
+
+# so luong UDP bang (numUEs)*(ue[*].numApps) 
+*.server.numApps = 2
+
+#============= cai dat Application  =============
+*.server.app[*].typename = "CbrReceiver"
+*.server.app[*].localPort = 3000+ancestorIndex(0)
+
+*.ue[*].app[*].typename = "CbrSender"
+*.ue[*].app[*].destAddress = "server" 
+*.ue[*].app[*].PacketSize = 1000
+*.ue[*].app[*].sampling_time = 0.05s
+*.ue[*].app[*].localPort = 3088+ancestorIndex(0)
+*.ue[*].app[*].destPort = 3000+ancestorIndex(0)
+*.ue[*].app[*].startTime = uniform(0.02s, 0.05s)
+*.ue[*].app[*].finishTime = 39.9s
+*.ue[*].app[0].tos = -1
+*.ue[*].app[1].tos = 10
+#------------------------------------#
+
+
+#------------------------------------#
+# cai dat cho kich ban SplitBearer-CBR-DL
+#
+# O cai dat nayf, UE co 1 ket noi DL, khai thac dac diem cuar Split Bearer,
+# mot so goi se di qua gNodeB phu, mot so se di den eNodeB chinh.
+[Config SplitBearer-CBR-DL]
+extends = DualConnectivity
+
+# 1 UDP cho moi user
+*.ue[*].numApps = 1
+
+# so luong UDP bang (numUEs)*(ue[*].numApps) 
+*.server.numApps = 1
+
+#============= Cai dat Application =============
+*.ue[*].app[*].typename = "CbrReceiver"
+*.ue[*].app[*].localPort = 3000
+
+*.server.app[*].typename = "CbrSender"
+*.server.app[*].destAddress = "ue[" + string(ancestorIndex(0)) + "]" # obtain the address of the client by reading its index in the array of apps
+*.server.app[*].localPort = 3088+ancestorIndex(0) 
+*.server.app[*].destPort = 3000
+*.server.app[*].PacketSize = 1000
+*.server.app[*].sampling_time = 0.05s
+*.server.app[*].startTime = uniform(0.02s, 0.05s)
+*.server.app[*].finishTime = 39.9s
+*.server.app[*].tos = 20
+#------------------------------------#
+
